@@ -38,6 +38,7 @@ public:
     void open_file(NonnullRefPtr<Core::File> file);
     ErrorOr<void> fill_selection(u8 fill_byte);
     Optional<u8> get_byte(size_t position);
+    Vector<u8> get_selected_bytes();
     bool save_as(NonnullRefPtr<Core::File>);
     bool save();
 
