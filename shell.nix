@@ -13,8 +13,10 @@ gcc11Stdenv.mkDerivation {
     gmp
     libmpc
     libvirt
+    libxml2
     mpfr
     ninja
+    ocaml
     pixman
     qemu
     qemu_kvm
