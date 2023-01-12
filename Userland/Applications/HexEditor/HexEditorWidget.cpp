@@ -3,6 +3,9 @@
  * Copyright (c) 2021, Mustafa Quraish <mustafa@serenityos.org>
  * Copyright (c) 2022, the SerenityOS developers.
  * Copyright (c) 2022, Timothy Slater <tslater2006@gmail.com>
+ * Copyright (c) 2023, Edward Banner <edward.banner@gmail.com>
+ * Copyright (c) 2023, Andreas Krohn <?>
+ * Copyright (c) 2023, Guillaume Macneil <guillaume@gcmacneil.com>
  *
  * SPDX-License-Identifier: BSD-2-Clause
  */
@@ -35,6 +38,7 @@
 #include <LibGUI/TextBox.h>
 #include <LibGUI/Toolbar.h>
 #include <LibGUI/ToolbarContainer.h>
+#include <LibTextCodec/Decoder.h>
 #include <string.h>
 
 REGISTER_WIDGET(HexEditor, HexEditor);
@@ -312,11 +316,11 @@ void HexEditorWidget::update_inspector_values(size_t position)
 
         value_inspector_model->set_parsed_value(ValueInspectorModel::ValueType::SignedByte, DeprecatedString::number(static_cast<i8>(unsigned_byte_value)));
         value_inspector_model->set_parsed_value(ValueInspectorModel::ValueType::UnsignedByte, DeprecatedString::number(unsigned_byte_value));
-        value_inspector_model->set_parsed_value(ValueInspectorModel::ValueType::ASCII, DeprecatedString::formatted("{:c}", static_cast<char>(unsigned_byte_value)));
+        value_inspector_model->set_parsed_value(ValueInspectorModel::ValueType::ASCII, make_display_string(DeprecatedString::formatted("{:c}", static_cast<char>(unsigned_byte_value))));
     } else {
         value_inspector_model->set_parsed_value(ValueInspectorModel::ValueType::SignedByte, "");
         value_inspector_model->set_parsed_value(ValueInspectorModel::ValueType::UnsignedByte, "");
-        value_inspector_model->set_parsed_value(ValueInspectorModel::ValueType::ASCII, "");
+        value_inspector_model->set_parsed_value(ValueInspectorModel::ValueType::ASCII, make_display_string(""));
     }
 
     if (byte_read_count >= 2) {
@@ -359,23 +363,23 @@ void HexEditorWidget::update_inspector_values(size_t position)
         value_inspector_model->set_parsed_value(ValueInspectorModel::ValueType::Double, "");
     }
 
-    // FIXME: This probably doesn't honour endianness correctly.
     Utf8View utf8_view { ReadonlyBytes { reinterpret_cast<u8 const*>(&unsigned_64_bit_int), 4 } };
     size_t valid_bytes;
     utf8_view.validate(valid_bytes);
     if (valid_bytes == 0)
-        value_inspector_model->set_parsed_value(ValueInspectorModel::ValueType::UTF8, "");
+        value_inspector_model->set_parsed_value(ValueInspectorModel::ValueType::UTF8, make_display_string(""));
     else
-        value_inspector_model->set_parsed_value(ValueInspectorModel::ValueType::UTF8, utf8_view.unicode_substring_view(0, 1).as_string());
+        value_inspector_model->set_parsed_value(ValueInspectorModel::ValueType::UTF8, make_display_string(utf8_view.unicode_substring_view(0, 1).as_string()));
 
+    // FIXME: The byte read count doesn't need to be even for UTF-16 to be valid
     if (byte_read_count % 2 == 0) {
         Utf16View utf16_view { Span<u16 const> { reinterpret_cast<u16 const*>(&unsigned_64_bit_int), 4 } };
         size_t valid_code_units;
         utf8_view.validate(valid_code_units);
         if (valid_code_units == 0)
-            value_inspector_model->set_parsed_value(ValueInspectorModel::ValueType::UTF16, "");
+            value_inspector_model->set_parsed_value(ValueInspectorModel::ValueType::UTF16, make_display_string(""));
         else
-            value_inspector_model->set_parsed_value(ValueInspectorModel::ValueType::UTF16, utf16_view.unicode_substring_view(0, 1).to_deprecated_string().release_value_but_fixme_should_propagate_errors());
+            value_inspector_model->set_parsed_value(ValueInspectorModel::ValueType::UTF16, make_display_string(utf16_view.unicode_substring_view(0, 1).to_deprecated_string().release_value_but_fixme_should_propagate_errors()));
     } else {
         value_inspector_model->set_parsed_value(ValueInspectorModel::ValueType::UTF16, "");
     }
@@ -402,6 +406,17 @@ void HexEditorWidget::update_inspector_values(size_t position)
         value_inspector_model->set_parsed_value(ValueInspectorModel::ValueType::UTF8String, utf8_string_view.as_string());
 
     // FIXME: Parse as other values like Timestamp etc
+
+    Vector<u8> selected_bytes = m_editor->get_selected_bytes();
+
+    DeprecatedString ascii_string(selected_bytes.span());
+    value_inspector_model->set_parsed_value(ValueInspectorModel::ValueType::ASCIIString, make_display_string(ascii_string));
+
+    DeprecatedString utf8_string = TextCodec::decoder_for("utf-8"sv)->to_utf8(StringView(selected_bytes.span()));
+    value_inspector_model->set_parsed_value(ValueInspectorModel::ValueType::UTF8String, make_display_string(utf8_string));
+
+    DeprecatedString utf16_string = TextCodec::decoder_for("utf-16le"sv)->to_utf8(StringView(selected_bytes.span()));
+    value_inspector_model->set_parsed_value(ValueInspectorModel::ValueType::UTF16String, make_display_string(utf16_string));
 
     m_value_inspector->set_model(value_inspector_model);
     m_value_inspector->update();
@@ -615,4 +630,24 @@ void HexEditorWidget::drop_event(GUI::DropEvent& event)
             return;
         open_file(response.value());
     }
+}
+
+DeprecatedString HexEditorWidget::make_display_string(DeprecatedString string)
+{
+    StringBuilder builder;
+    for (auto code_point : string) {
+        if (code_point == '\t')
+            builder.append("\\t", 2);
+        else if (code_point == '\n')
+            builder.append("\\n", 2);
+        else if (code_point == '\v')
+            builder.append("\\v", 2);
+        else if (code_point == '\f')
+            builder.append("\\f", 2);
+        else if (code_point == '\r')
+            builder.append("\\r", 2);
+        else
+            builder.append(code_point);
+    }
+    return MUST(builder.to_string()).to_deprecated_string();
 }

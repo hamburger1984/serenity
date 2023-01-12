@@ -3,6 +3,9 @@
  * Copyright (c) 2021, Mustafa Quraish <mustafa@serenityos.org>
  * Copyright (c) 2022, the SerenityOS developers.
  * Copyright (c) 2022, Timothy Slater <tslater2006@gmail.com>
+ * Copyright (c) 2023, Edward Banner <edward.banner@gmail.com>
+ * Copyright (c) 2023, Andreas Krohn <?>
+ * Copyright (c) 2023, Guillaume Macneil <guillaume@gcmacneil.com>
  *
  * SPDX-License-Identifier: BSD-2-Clause
  */
